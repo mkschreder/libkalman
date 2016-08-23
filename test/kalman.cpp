@@ -3,15 +3,9 @@
 #include <cfloat>
 
 #include "KalmanFilter.hpp"
+#include "test-macros.hpp"
 
 using namespace matrix; 
-
-static inline bool is_equal(float a, float b, float e = FLT_EPSILON){
-	return fabsf(a - b) < e; 
-}
-
-#define STR(x) #x
-#define TEST(x) if(!(x)){ printf("test failed at %d, %s: %s\n", __LINE__, __FILE__, STR(x)); exit(-1); }
 
 int main(){
 	KalmanFilter<2, 1, 1> k; 
