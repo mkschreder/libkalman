@@ -17,22 +17,30 @@
 
 #pragma once
 
-#include <matrix/matrix/Matrix.hpp>
-#include <matrix/matrix/SquareMatrix.hpp>
-#include <matrix/matrix/Vector.hpp>
+//#include <matrix/matrix/Matrix.hpp>
+//#include <matrix/matrix/SquareMatrix.hpp>
+//#include <matrix/matrix/Vector.hpp>
+
+#include <eigen3/Eigen/Dense>
+
+namespace Eigen {
+namespace filter {
+
+//template<typename Type, size_t N>
+//class Vector : public Matrix<Type, N, 1> { }; 
 
 // KalmanFilter template (xc = size of state, zc = size of measurement, uc = size of control vector)
 template<unsigned int XC, unsigned int ZC, unsigned int UC>
 class KalmanFilter {
 public: 
-	typedef matrix::Matrix<float, XC, XC> StateMatrixType; 	
-	typedef matrix::Matrix<float, ZC, ZC> InputMatrixType; 	
-	typedef matrix::Matrix<float, ZC, XC> StateInputMatrixType; 	
-	typedef matrix::Matrix<float, XC, ZC> GainMatrixType; 	
-	typedef matrix::Matrix<float, XC, UC> ControlMatrixType; 	
-	typedef matrix::Vector<float, XC> StateVectorType; 
-	typedef matrix::Vector<float, ZC> InputVectorType; 
-	typedef matrix::Vector<float, UC> ControlVectorType; 
+	typedef Matrix<float, XC, XC> StateMatrixType; 	
+	typedef Matrix<float, ZC, ZC> InputMatrixType; 	
+	typedef Matrix<float, ZC, XC> StateInputMatrixType; 	
+	typedef Matrix<float, XC, ZC> GainMatrixType; 	
+	typedef Matrix<float, XC, UC> ControlMatrixType; 	
+	typedef Matrix<float, XC, 1> StateVectorType; 
+	typedef Matrix<float, ZC, 1> InputVectorType; 
+	typedef Matrix<float, UC, 1> ControlVectorType; 
 
 	KalmanFilter(){
 		F.setIdentity(); 
@@ -46,15 +54,15 @@ public:
 	void predict(const ControlVectorType &uk){
 		// predict
 		xk = F * xk + B * uk; 
-		P = F * P * F.transposed() + Q; 
+		P = F * P * F.transpose() + Q; 
 	}
 	void update(const InputVectorType &zk){
 		// observe
 		InputVectorType y = zk - H * xk; 
-		InputMatrixType S = H * P * H.transposed() + R; 
+		InputMatrixType S = H * P * H.transpose() + R; 
 
 		// update
-		GainMatrixType K = P * H.transposed() * matrix::inversed(S); 
+		GainMatrixType K = P * H.transpose() * S.inverse(); 
 		xk = xk + K * y; 
 		P = P - K * H * P; 
 	}
@@ -113,7 +121,7 @@ private:
 }; 
 
 template<unsigned int x, unsigned int y>
-void print_matrix(const char *name, const matrix::Matrix<float, x, y> &m){
+void printm(const char *name, const Matrix<float, x, y> &m){
 	printf("%s = [\n", name); 
 	for(size_t i = 0; i < x; i++){
 		for(size_t j = 0; j < y; j++){
@@ -129,30 +137,34 @@ class UnscentedKalmanFilter {
 public: 
 	#define NUM_SIGMA_POINTS (XC * 2u + 1u)
 
-	typedef matrix::Matrix<float, XC, XC> StateMatrixType; 	
-	typedef matrix::Matrix<float, ZC, ZC> InputMatrixType; 	
-	typedef matrix::Matrix<float, ZC, XC> StateInputMatrixType; 	
-	typedef matrix::Matrix<float, XC, ZC> GainMatrixType; 	
-	typedef matrix::Matrix<float, XC, UC> ControlMatrixType; 	
-	typedef matrix::Vector<float, XC> StateVectorType; 
-	typedef matrix::Vector<float, ZC> InputVectorType; 
-	typedef matrix::Vector<float, UC> ControlVectorType; 
-	typedef matrix::Vector<float, NUM_SIGMA_POINTS> WeightsVectorType; 
-	typedef matrix::Matrix<float, NUM_SIGMA_POINTS, XC> SigmaStateMatrixType; 
-	typedef matrix::Matrix<float, NUM_SIGMA_POINTS, ZC> SigmaInputMatrixType; 
+	typedef Matrix<float, XC, XC> StateMatrixType; 	
+	typedef Matrix<float, ZC, ZC> InputMatrixType; 	
+	typedef Matrix<float, ZC, XC> StateInputMatrixType; 	
+	typedef Matrix<float, XC, ZC> GainMatrixType; 	
+	typedef Matrix<float, XC, UC> ControlMatrixType; 	
+	typedef Matrix<float, XC, 1> StateVectorType; 
+	typedef Matrix<float, ZC, 1> InputVectorType; 
+	typedef Matrix<float, UC, 1> ControlVectorType; 
+	typedef Matrix<float, NUM_SIGMA_POINTS, 1> WeightsVectorType; 
+	typedef Matrix<float, NUM_SIGMA_POINTS, XC> SigmaStateMatrixType; 
+	typedef Matrix<float, NUM_SIGMA_POINTS, ZC> SigmaInputMatrixType; 
 
-	typedef matrix::Vector<float, XC> (*f_proc)(const matrix::Vector<float, XC> &); 
-	typedef matrix::Vector<float, ZC> (*h_proc)(const matrix::Vector<float, XC> &); 
+	typedef Matrix<float, XC, 1> (*f_proc)(const Matrix<float, XC, 1> &, void*); 
+	typedef Matrix<float, ZC, 1> (*h_proc)(const Matrix<float, XC, 1> &, void*); 
 
-	UnscentedKalmanFilter(f_proc f, h_proc h){
+	UnscentedKalmanFilter(f_proc f, h_proc h, void *user_data){
 		B.setZero(); 
-		P.setIdentity(); 
 		R.setIdentity(); 
 		Q.setIdentity(); 
+		P.setIdentity(); 
 		xk.setZero(); 
-		
+		xp.setZero(); 
+		Wm.setZero(); 
+		Wc.setZero(); 
+
 		_prediction_fn = f; 
 		_measurement_fn = h; 
+		_userdata = user_data; 
 
 		// sigma point selection constants
 		_alpha = 0.1f; 
@@ -169,46 +181,36 @@ public:
 		}
 		Wc(0) = _lambda / (XC + _lambda) + (1.0f - _alpha * _alpha + _beta); 
 		Wm(0) = _lambda / (XC + _lambda); 
-		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			//printf("W[%f, %f]\n", Wc(i), Wm(i)); 
-		}
 	}
 
 	void predict(const ControlVectorType &uk){
 		// predict
 		//xk = F * xk + B * uk; 
-		//P = F * P * F.transposed() + Q; 
+		//P = F * P * F.transpose() + Q; 
 
-		StateMatrixType U; 
-		if(!ldlt((XC + _lambda) * P, U)){
-			printf("Cholesky failed!\n"); 
-			//exit(1); 
-		} else {
-			//printf("Cholesky success!\n"); 
-		}
+		// TODO: can this one fail?
+		StateMatrixType X = ((XC + _lambda) * P); 
+		StateMatrixType U = X.llt().matrixL(); 
 
 		SigmaStateMatrixType sigmas; 
-		sigmas.setRow(0, xk.transposed()); 
+		sigmas.row(0) = xk.transpose(); 
 		for(size_t k = 0; k < XC; k++){
-			sigmas.setRow(k + 1, xk.transposed() + U.getRow(k)); 
-			sigmas.setRow(XC + k + 1, xk.transposed() - U.getRow(k)); 
-		}
-		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			//printf("E[%d, %f, %f]\n", i, sigmas(i, 0), sigmas(i, 1)); 
+			sigmas.row(k + 1) = xk.transpose() + U.row(k); 
+			sigmas.row(XC + k + 1) = xk.transpose() - U.row(k); 
 		}
 
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			_sigmas_f.setRow(i, _prediction_fn(sigmas.getRow(i).transposed()).transposed()); 
+			_sigmas_f.row(i) = _prediction_fn(sigmas.row(i).transpose(), _userdata).transpose(); 
 		}
 
 		for(size_t i = 0; i < XC; i++){
-			xp(i) = Wm.dot(_sigmas_f.getCol(i)); 
+			xp(i) = Wm.adjoint() * _sigmas_f.col(i); 
 		}
 
 		Pp.setZero(); 
 		for(size_t k = 0;  k < NUM_SIGMA_POINTS; k++){
-			StateVectorType y = _sigmas_f.getRow(k).transposed() - xp; 
-			Pp += Wc(k) * (y * y.transposed()); 
+			StateVectorType y = _sigmas_f.row(k).transpose() - xp; 
+			Pp += Wc(k) * (y * y.transpose()); 
 		}
 		Pp += Q; 
 	}
@@ -216,45 +218,42 @@ public:
 	void update(const InputVectorType &zk){
 		// observe
 		//InputVectorType y = zk - H * xk; 
-		//InputMatrixType S = H * P * H.transposed() + R; 
+		//InputMatrixType S = H * P * H.transpose() + R; 
 
 		// update
-		//GainMatrixType K = P * H.transposed() * matrix::inversed(S); 
+		//GainMatrixType K = P * H.transpose() * inversed(S); 
 		//xk = xk + K * y; 
 		//P = P - K * H * P; 
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			_sigmas_h.setRow(i, _measurement_fn(_sigmas_f.getRow(i).transposed())); 
+			_sigmas_h.row(i) = _measurement_fn(_sigmas_f.row(i).transpose(), _userdata); 
 		}
 
 		// transform measurements
 		InputVectorType zp; 
 
 		for(size_t i = 0; i < ZC; i++){
-			zp(i) = Wm.dot(_sigmas_h.getCol(i)); 
+			zp(i) = Wm.adjoint() * _sigmas_h.col(i); 
 		}
 
 		InputMatrixType Pz; 
 		Pz.setZero(); 
 		for(size_t k = 0;  k < NUM_SIGMA_POINTS; k++){
-			InputVectorType y = _sigmas_h.getRow(k) - zp.transposed(); 
-			Pz += Wc(k) * (y * y.transposed()); 
+			InputVectorType y = _sigmas_h.row(k) - zp.transpose(); 
+			Pz += Wc(k) * (y * y.transpose()); 
 		}
 		Pz += R; 
 		
 		GainMatrixType Pxz; 
 		Pxz.setZero(); 
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			Pxz += Wc(i) * (_sigmas_f.getRow(i).transposed() - xp) * ((_sigmas_h.getRow(i).transposed() - zp)); 
+			Pxz += Wc(i) * (_sigmas_f.row(i).transpose() - xp) * ((_sigmas_h.row(i).transpose() - zp)); 
 		}
 
-		GainMatrixType K = Pxz * inversed(Pz); 
+		GainMatrixType K = Pxz * Pz.inverse(); 
 		xk = xp + K * (zk - zp); 
-		P = Pp - K * Pz * K.transposed(); 
+		P = Pp - K * Pz * K.transpose(); 
 
-		//StateMatrixType U; 
-		//print_matrix<2, 2>("P", P); 
-		//if(!ldlt(P, U)){ printf("Cholesky failed!\n"); exit(1); }
-		//print_matrix<2, 2>("U", U); 
+		//printm<2, 2>("P", P); 
 	}
 	void set_xk(const StateVectorType &vec){
 		xk = vec; 
@@ -311,10 +310,8 @@ private:
 
 	f_proc _prediction_fn; 
 	h_proc _measurement_fn; 
+	void *_userdata; 
 }; 
-
-namespace kalman {
-namespace ukf {
 
 }
 }
