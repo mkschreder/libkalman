@@ -17,45 +17,57 @@ std::normal_distribution<double> norm_dist(0.0,1.0);
 #define limit(x, a, b) (((x) < (a))?(a):(((x) > (b))?(b):(x)))
 
 float f_process(float theta){
-	return sin(theta) * 10; //2 * theta + 1; 
+	float vel = (rand() % 1000000u) / (float)1e6 - 0.5f; 
+	static float state = 0; 
+	state += vel; 
+	return state; //2 * theta + 1; 
 }
 
 float h_process(float x){
 	return (x - 1) / 2.0f; 
 }
 
-Matrix<float, 2, 1> f_proc(const Matrix<float, 2, 1> &i, void *u){
-	Matrix<float, 2, 1> data; 
+Matrix<float, 3, 1> f_proc(const Matrix<float, 3, 1> &i, void *u){
+	Matrix<float, 3, 1> data; 
 	data << 
 		i(0) + i(1), 
-		i(1); 
+		i(1) + i(2),
+		i(2); 
 	return data; 
 }
 
-Matrix<float, 1, 1> h_proc(const Matrix<float, 2, 1> &i, void *u){
+Matrix<float, 1, 1> h_proc(const Matrix<float, 3, 1> &i, void *u){
 	Matrix <float, 1, 1> data; 
 	data << i(0); 
 	return data; 
 }
 
+Matrix<float, 3, 3> Q_discrete_white_noise_3(float dt, float var){
+	Matrix<float, 3, 3> q; 
+	q << 
+		0.25f*pow(dt, 4), 0.5 * pow(dt, 3), 0.5 * pow(dt, 2), 
+		0.50f*pow(dt, 3), pow(dt, 2), dt, 
+		0.50f*pow(dt, 2), dt, 1; 
+	return q * var;  
+}
+
 int main(){
-	UnscentedKalmanFilter<2, 1, 1> k(f_proc, h_proc, NULL); 
+	UnscentedKalmanFilter<3, 1, 1> k(f_proc, h_proc, NULL); 
 	const float dt = 0.01; 
 
 	// set initial state
-	k.set_xk(Matrix<float, 2, 1>((const float[]){0, 0.0})); 
+	k.set_xk(Matrix<float, 3, 1>((const float[]){0, 0.0, 0})); 
 
 	// setup initial belief
-	Matrix<float, 2, 2> P; 
-	Matrix<float, 2, 2> Q; 
+	Matrix<float, 3, 3> P; 
+	Matrix<float, 3, 3> Q; 
 	Matrix<float, 1, 1> R; 
 	P << 
-		0.1, 0, 
-		0, 0.001; 
-	Q << 
-		0.001, 0.03,
-		0.03, 0.01; 
-	R << 1.0f; 
+		0.1, 0, 0, 
+		0, 0.001, 0,
+		0, 0, 10; 
+	Q = Q_discrete_white_noise_3(1.0, 0.1);  
+	R << pow(50.0f, 2); 
 
 	k.set_P(P); 
 
@@ -72,11 +84,14 @@ int main(){
 			k.predict(Matrix<float, 1, 1>()); 
 		//}
 		float truth = f_process(theta); 
-		float noise = norm_dist(rng); 
-		float z[1] = {truth + noise}; 
+		float noisen = norm_dist(rng); 
+		float noise = sin(rand() / M_PI); 
+		float z[1] = {truth + noisen}; 
+		if(rand() % 10 > 5) z[0] *= 0.0; 
 		k.update(Matrix<float, 1, 1>(z)); 
-		Matrix<float, 2, 1> xk = k.get_prediction(); 
-		printf("%f, %f, %f, %f, %f\n", theta, truth, z[0], xk(0), xk(1)); 
+		Matrix<float, 3, 1> xk = k.get_prediction(); 
+		Matrix<float, 3, 3> P = k.get_P(); 
+		printf("%f, %f, %f, %f, %f, %f, %f, %f, %f\n", theta, truth, z[0], xk(0), xk(1), P(0, 0), P(0, 1), P(1, 0), P(1, 1)); 
 		
 		// start test after 10 iterations
 		//if(it > 10) TEST(is_equal(truth, xk(0), 0.1f)); 

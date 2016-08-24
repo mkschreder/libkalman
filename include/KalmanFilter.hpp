@@ -184,10 +184,7 @@ public:
 	}
 
 	void predict(const ControlVectorType &uk){
-		// predict
-		//xk = F * xk + B * uk; 
-		//P = F * P * F.transpose() + Q; 
-
+		// generate sigma points for current mean and variance
 		// TODO: can this one fail?
 		StateMatrixType X = ((XC + _lambda) * P); 
 		StateMatrixType U = X.llt().matrixL(); 
@@ -198,15 +195,15 @@ public:
 			sigmas.row(k + 1) = xk.transpose() + U.row(k); 
 			sigmas.row(XC + k + 1) = xk.transpose() - U.row(k); 
 		}
-
+		
+		// project sigma points into next timestep
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
 			_sigmas_f.row(i) = _prediction_fn(sigmas.row(i).transpose(), _userdata).transpose(); 
 		}
 
-		for(size_t i = 0; i < XC; i++){
-			xp(i) = Wm.adjoint() * _sigmas_f.col(i); 
-		}
-
+		// unscented transform of sigma points into mean and covariance
+		xp = _sigmas_f.transpose() * Wm; 
+		
 		Pp.setZero(); 
 		for(size_t k = 0;  k < NUM_SIGMA_POINTS; k++){
 			StateVectorType y = _sigmas_f.row(k).transpose() - xp; 
@@ -216,24 +213,13 @@ public:
 	}
 
 	void update(const InputVectorType &zk){
-		// observe
-		//InputVectorType y = zk - H * xk; 
-		//InputMatrixType S = H * P * H.transpose() + R; 
-
-		// update
-		//GainMatrixType K = P * H.transpose() * inversed(S); 
-		//xk = xk + K * y; 
-		//P = P - K * H * P; 
+		// generate measurement sigma points from current prediction sigma points
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
 			_sigmas_h.row(i) = _measurement_fn(_sigmas_f.row(i).transpose(), _userdata); 
 		}
 
-		// transform measurements
-		InputVectorType zp; 
-
-		for(size_t i = 0; i < ZC; i++){
-			zp(i) = Wm.adjoint() * _sigmas_h.col(i); 
-		}
+		// transform measurement sigmas into measurement mean and covariance
+		InputVectorType zp = _sigmas_h.transpose() * Wm; 
 
 		InputMatrixType Pz; 
 		Pz.setZero(); 
@@ -242,18 +228,19 @@ public:
 			Pz += Wc(k) * (y * y.transpose()); 
 		}
 		Pz += R; 
-		
+	
+		// compute cross variance 
 		GainMatrixType Pxz; 
 		Pxz.setZero(); 
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			Pxz += Wc(i) * (_sigmas_f.row(i).transpose() - xp) * ((_sigmas_h.row(i).transpose() - zp)); 
+			GainMatrixType outer = (_sigmas_f.row(i).transpose() - xp) * (_sigmas_h.row(i).transpose() - zp).transpose(); 
+			Pxz += Wc(i) * outer; 
 		}
-
+		
+		// update kalman gain, mean and covariance
 		GainMatrixType K = Pxz * Pz.inverse(); 
 		xk = xp + K * (zk - zp); 
 		P = Pp - K * Pz * K.transpose(); 
-
-		//printm<2, 2>("P", P); 
 	}
 	void set_xk(const StateVectorType &vec){
 		xk = vec; 
