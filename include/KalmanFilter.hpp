@@ -17,10 +17,6 @@
 
 #pragma once
 
-//#include <matrix/matrix/Matrix.hpp>
-//#include <matrix/matrix/SquareMatrix.hpp>
-//#include <matrix/matrix/Vector.hpp>
-
 #include <eigen3/Eigen/Dense>
 
 namespace Eigen {
@@ -132,6 +128,13 @@ void printm(const char *name, const Matrix<float, x, y> &m){
 	printf("]\n"); 
 }
 
+template<size_t XC, size_t ZC>
+class IUKFModel {
+public: 
+	virtual Matrix<float, XC, 1> F(const Matrix<float, XC, 1> &) = 0; 
+	virtual Matrix<float, ZC, 1> H(const Matrix<float, XC, 1> &) = 0; 
+}; 
+
 template<unsigned int XC, unsigned int ZC, unsigned int UC>
 class UnscentedKalmanFilter {
 public: 
@@ -149,22 +152,16 @@ public:
 	typedef Matrix<float, NUM_SIGMA_POINTS, XC> SigmaStateMatrixType; 
 	typedef Matrix<float, NUM_SIGMA_POINTS, ZC> SigmaInputMatrixType; 
 
-	typedef Matrix<float, XC, 1> (*f_proc)(const Matrix<float, XC, 1> &, void*); 
-	typedef Matrix<float, ZC, 1> (*h_proc)(const Matrix<float, XC, 1> &, void*); 
-
-	UnscentedKalmanFilter(f_proc f, h_proc h, void *user_data){
+	UnscentedKalmanFilter(IUKFModel<XC, ZC> *model){
 		B.setZero(); 
 		R.setIdentity(); 
 		Q.setIdentity(); 
 		P.setIdentity(); 
 		xk.setZero(); 
-		xp.setZero(); 
 		Wm.setZero(); 
 		Wc.setZero(); 
-
-		_prediction_fn = f; 
-		_measurement_fn = h; 
-		_userdata = user_data; 
+		
+		_model = model; 
 
 		// sigma point selection constants
 		_alpha = 0.1f; 
@@ -198,15 +195,17 @@ public:
 		
 		// project sigma points into next timestep
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			_sigmas_f.row(i) = _prediction_fn(sigmas.row(i).transpose(), _userdata).transpose(); 
+			_sigmas_f.row(i) = _model->F(sigmas.row(i).transpose()).transpose(); 
 		}
 
 		// unscented transform of sigma points into mean and covariance
-		xp = _sigmas_f.transpose() * Wm; 
+
+		// predict next mean 
+		xk = _sigmas_f.transpose() * Wm; 
 		
 		Pp.setZero(); 
 		for(size_t k = 0;  k < NUM_SIGMA_POINTS; k++){
-			StateVectorType y = _sigmas_f.row(k).transpose() - xp; 
+			StateVectorType y = _sigmas_f.row(k).transpose() - xk; 
 			Pp += Wc(k) * (y * y.transpose()); 
 		}
 		Pp += Q; 
@@ -215,7 +214,7 @@ public:
 	void update(const InputVectorType &zk){
 		// generate measurement sigma points from current prediction sigma points
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			_sigmas_h.row(i) = _measurement_fn(_sigmas_f.row(i).transpose(), _userdata); 
+			_sigmas_h.row(i) = _model->H(_sigmas_f.row(i).transpose()); 
 		}
 
 		// transform measurement sigmas into measurement mean and covariance
@@ -233,13 +232,13 @@ public:
 		GainMatrixType Pxz; 
 		Pxz.setZero(); 
 		for(size_t i = 0; i < NUM_SIGMA_POINTS; i++){
-			GainMatrixType outer = (_sigmas_f.row(i).transpose() - xp) * (_sigmas_h.row(i).transpose() - zp).transpose(); 
+			GainMatrixType outer = (_sigmas_f.row(i).transpose() - xk) * (_sigmas_h.row(i).transpose() - zp).transpose(); 
 			Pxz += Wc(i) * outer; 
 		}
 		
 		// update kalman gain, mean and covariance
 		GainMatrixType K = Pxz * Pz.inverse(); 
-		xk = xp + K * (zk - zp); 
+		xk = xk + K * (zk - zp); 
 		P = Pp - K * Pz * K.transpose(); 
 	}
 	void set_xk(const StateVectorType &vec){
@@ -281,7 +280,7 @@ private:
 	StateMatrixType P;  
 
 	// filter state 
-	StateVectorType xk, xp; 
+	StateVectorType xk; 
 
 	StateMatrixType Pp; 
 
@@ -295,9 +294,7 @@ private:
 
 	float _alpha, _beta, _kappa, _lambda; 
 
-	f_proc _prediction_fn; 
-	h_proc _measurement_fn; 
-	void *_userdata; 
+	IUKFModel<XC, ZC> *_model; 
 }; 
 
 }

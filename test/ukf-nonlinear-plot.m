@@ -82,11 +82,11 @@ endfunction
 
 data = csvread("ukf-nonlinear-out.csv"); 
 
-for i = 1:length(data(:,2))
-	var = [data(i, 6), data(i, 7); 
-			data(i, 8), data(i, 9)]; 
+%for i = 1:length(data(:,2))
+%	var = [data(i, 6), data(i, 7); 
+%			data(i, 8), data(i, 9)]; 
 	%plot_variance([data(i, 1) data(i, 4)], var);  
-endfor 
+%endfor 
 
 calc_vel = [0; diff(data(:,2))]; 
 filt_vel = [0; diff(data(:,4))]; 
@@ -99,7 +99,7 @@ plot(
 	data(:,1), data(:,3), 
 	data(:,1), data(:,4),
 	data(:,1), filt_pos,
-	data(:,1), data(:,5) * 100
+	data(:,1), data(:,5) * 10
 	%data(:,1), calc_vel
 ); 
 
