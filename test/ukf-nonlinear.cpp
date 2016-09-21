@@ -50,7 +50,10 @@ Matrix<float, 3, 3> Q_discrete_white_noise_3(float dt, float var){
 }
 
 int main(){
-	ConstantVelocityPositionFilter<float> k(10, 50); 
+	ConstantVelocityPositionFilter<float> k(40, 40.0f, 1.0f); 
+	Eigen::Matrix<float, 2, 1> xk; 
+	xk << 1.5, 0; 
+	k.set_prediction(xk); 
 
 	int it = 0; 
 
@@ -62,15 +65,18 @@ int main(){
 	}
 
 	unsigned int i = 0; 
+
 	while(std::getline(file, line)){
 		float front, back, right, left; 
 		sscanf(line.c_str(), "%f, %f, %f, %f", &front, &back, &right, &left); 
-	
+		
 		k.predict(); 
-		if(right > 0.3f)
-			k.input_position(right); 
+		//if(front > 1.5) front = 2.0f; 
+		if(front > 0.3f)
+			k.input_position(front); 
+
 		Matrix<float, 2, 1> xk = k.get_prediction(); 
-		printf("%f, %f, %f, %f, %f\n", (float)it, 0.0f, right, xk(0), xk(1)); 
+		printf("%f, %f, %f, %f, %f\n", (float)it, 0.0f, front, xk(0), xk(1)); 
 		
 		// start test after 10 iterations
 		//if(it > 10) TEST(is_equal(truth, xk(0), 0.1f)); 

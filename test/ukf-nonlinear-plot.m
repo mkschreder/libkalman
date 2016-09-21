@@ -93,13 +93,15 @@ filt_vel = [0; diff(data(:,4))];
 
 [b, a] = butter(2, (1/50) / 0.5); 
 filt_pos = filter(b, a, data(:, 3)); 
+
 plot(
 	%data(:,1), data(:,1), 
 	data(:,1), data(:,2), 
-	data(:,1), data(:,3), 
+	%data(:,1), data(:,3), 
 	data(:,1), data(:,4),
-	data(:,1), filt_pos,
-	data(:,1), data(:,5) * 10
+	%data(:,1), filt_pos,
+	data(:,1), filt_vel * 10
+	%data(:,1), data(:,5) * 10
 	%data(:,1), calc_vel
 ); 
 

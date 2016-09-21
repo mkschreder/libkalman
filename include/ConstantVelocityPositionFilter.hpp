@@ -26,7 +26,7 @@ namespace filter {
 template<typename Type>
 class ConstantVelocityPositionFilter : public IUKFModel<2, 1>{
 public: 
-	ConstantVelocityPositionFilter(Type _q, Type _r) : _k(this){
+	ConstantVelocityPositionFilter(Type _q, Type _r, Type _dt = 1.0f) : _k(this){
 		// set initial state
 		_k.set_xk(Matrix<Type, 2, 1>((const Type[]){0.0, 0.0})); 
 
@@ -37,7 +37,7 @@ public:
 		P << 
 			0.1, 0, 
 			0, 0.001; 
-		Q = _Q_discrete_white_noise_2(1.0, _q);  
+		Q = _Q_discrete_white_noise_2(_dt, _q);  
 		R << ::pow(_r, 2); 
 
 		// setup initial covariance 
@@ -58,6 +58,10 @@ public:
 		Matrix<Type, 1, 1> m; 
 		m << val; 
 		_k.update(m); 
+	}
+	
+	void set_prediction(const Matrix<Type, 2, 1> &m){
+		_k.set_xk(m); 
 	}
 
 	Matrix<Type, 2, 1> get_prediction(){
