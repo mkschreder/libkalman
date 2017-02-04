@@ -131,8 +131,8 @@ void printm(const char *name, const Matrix<float, x, y> &m){
 template<size_t XC, size_t ZC>
 class IUKFModel {
 public: 
-	virtual Matrix<float, XC, 1> F(const Matrix<float, XC, 1> &) = 0; 
-	virtual Matrix<float, ZC, 1> H(const Matrix<float, XC, 1> &) = 0; 
+	virtual Matrix<float, XC, ZC> F(const Matrix<float, XC, ZC> &) = 0; 
+	virtual Matrix<float, ZC, ZC> H(const Matrix<float, XC, ZC> &) = 0; 
 }; 
 
 template<unsigned int XC, unsigned int ZC, unsigned int UC>
