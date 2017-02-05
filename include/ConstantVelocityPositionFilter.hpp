@@ -24,29 +24,31 @@ namespace Eigen {
 namespace filter {
 
 template<typename Type>
-class ConstantVelocityPositionFilter : public IUKFModel<2, 1>{
+class ConstantVelocityPositionFilter : public IUKFModel<3, 1>{
 public: 
 	ConstantVelocityPositionFilter(Type _q, Type _r, Type _dt = 1.0f) : _k(this){
 		// set initial state
-		_k.set_xk(Matrix<Type, 2, 1>((const Type[]){0.0, 0.0})); 
+		_k.set_xk(Matrix<Type, 3, 1>((const Type[]){0.0, 0.0, 0.0})); 
 
 		// setup initial belief
-		Matrix<Type, 2, 2> P; 
-		Matrix<Type, 2, 2> Q; 
+		Matrix<Type, 3, 3> P; 
+		Matrix<Type, 3, 3> Q; 
 		Matrix<Type, 1, 1> R; 
 
 		// this tells us how much we trust each reading. 
 		// lower value means more trust
 		// higher value means less trust
 		P << 
-			0, 0,
-			0, 0;
+			0, 0, 0,
+			0, 0, 0,
+			0, 0, 0;
 		//Q = _Q_discrete_white_noise_2(0.01, 0.001);  
 		Q << 
-			0.0, 0.0,
-			0.0, 1e-4;
+			1e-2, 0.0, 0.0,
+			0.0, 1e-4, 0.0,
+			0.0, 0.0, 1e-7;
 
-		R << 0.6f; //::pow(_r, 2); 
+		R << 0.7f; //::pow(_r, 2); 
 
 		// setup initial covariance 
 		_k.set_P(P); 
@@ -70,28 +72,29 @@ public:
 		_k.update(m);
 	}
 
-	void set_prediction(const Matrix<Type, 2, 1> &m){
+	void set_prediction(const Matrix<Type, 3, 1> &m){
 		_k.set_xk(m); 
 	}
 
-	Matrix<Type, 2, 1> get_prediction(){
+	Matrix<Type, 3, 1> get_prediction(){
 		return _k.get_prediction();
 	}
 protected: 
-	virtual Matrix<Type, 2, 1> F(const Matrix<Type, 2, 1> &i) override {
-		Matrix<float, 2, 1> data;
+	virtual Matrix<Type, 3, 1> F(const Matrix<Type, 3, 1> &i) override {
+		Matrix<float, 3, 1> data;
 		data <<
-			i(0) + i(1),
-			i(1);
+			i(0) + i(1) + i(2),
+			i(1) + i(2),
+			i(2);
 		return data;
 	}
-	virtual Matrix<Type, 1, 1> H(const Matrix<Type, 2, 1> &i) override {
+	virtual Matrix<Type, 1, 1> H(const Matrix<Type, 3, 1> &i) override {
 		Matrix <float, 1, 1> data;
 		data << i(0);
 		return data;
 	}
 private: 
-	UnscentedKalmanFilter<2, 1, 1> _k;  
+	UnscentedKalmanFilter<3, 1, 1> _k;  
 
 	Matrix<Type, 2, 2> _Q_discrete_white_noise_2(Type dt, Type var){
 		Matrix<Type, 2, 2> q; 

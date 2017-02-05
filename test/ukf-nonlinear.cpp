@@ -186,9 +186,11 @@ int main(){
 	//sem_t _shutdown;
 	//sem_init(&_shutdown, 0, 0);
 	ConstantVelocityPositionFilter<float> k(0.01f, 0.01f, 0.001f); 
-	Eigen::Matrix<float, 2, 1> xk; 
-	xk << 0, 0; 
+	ConstantVelocityPositionFilter<float> a(0.01f, 0.01f, 0.001f); 
+	Eigen::Matrix<float, 3, 1> xk; 
+	xk << 0, 0, 0; 
 	k.set_prediction(xk); 
+	a.set_prediction(xk); 
 
 	int it = 0; 
 
@@ -205,6 +207,7 @@ int main(){
 	printf("time = [];\n");
 	printf("pos_x = [];\n");
 	printf("vel_x = [];\n");
+	printf("acc_x = [];\n");
 	printf("pos_sp = [];\n");
 	printf("vel_sp = [];\n");
 	printf("int_pos = [];\n");
@@ -222,16 +225,24 @@ int main(){
 		//sscanf(line.c_str(), "%f, %f, %f, %f", &front, &back, &right, &left); 
 		
 		k.predict();
+		a.predict();
 
 		float err = ((1000 - (rand() % 2000)) * 1e-3);
 		float p = pos_sp + err * 0.002f;
 		k.input_position(p);
+
+		Matrix<float, 3, 1> xk = k.get_prediction(); 
+
+		float pos = xk(0);
+		float vel = xk(1) * 1000;
+		float acc = xk(2) * 1000000;
+
 		//k.input_position(pos_sp);
 
-		Matrix<float, 2, 1> xk = k.get_prediction(); 
+		a.input_position(vel);
+		Matrix<float, 3, 1> xka = a.get_prediction(); 
 
-		float vel = xk(1) * 1000;
-		float pos = xk(0);
+		//acc = xka(1) * 1000;
 		if(fabsf(vel) > 2) vel = 0;
 		if(fabsf(pos) > 4) pos = 0;
 		printf("time = [time; %f];\n", (float)it);
@@ -239,6 +250,7 @@ int main(){
 		printf("pos_sp = [pos_sp; %f];\n", pos_sp);
 		printf("pos_x = [pos_x; %f];\n", pos);
 		printf("vel_x = [vel_x; %f];\n", vel);
+		printf("acc_x = [acc_x; %f];\n", acc);
 		printf("int_pos = [int_pos; %f];\n", int_pos);
 	
 		int_pos += xk(1);
@@ -247,7 +259,7 @@ int main(){
 		it++; 
 	}
 
-	printf("plot(time, pos_x, time, vel_x, time, pos_sp, time, vel_sp, time, int_pos);\n");
+	printf("plot(time, pos_x, time, vel_x, time, pos_sp, time, vel_sp, time, acc_x);\n");
 	//printf("plot(time, pos_x, time, vel_x);\n");
 	printf("input(\"press any key\");\n");
 
