@@ -39,13 +39,14 @@ public:
 		// lower value means more trust
 		// higher value means less trust
 		P << 
-			1, 0, 
-			0, 1; 
-		Q = _Q_discrete_white_noise_2(0.001, 0.01);  
-		/*Q << 
-			1, 0.01,
-			0.01, 1;*/
-		R << 1.0f; //::pow(_r, 2); 
+			0, 0,
+			0, 0;
+		//Q = _Q_discrete_white_noise_2(0.01, 0.001);  
+		Q << 
+			0.0, 0.0,
+			0.0, 1e-4;
+
+		R << 0.6f; //::pow(_r, 2); 
 
 		// setup initial covariance 
 		_k.set_P(P); 
@@ -64,11 +65,11 @@ public:
 	}
 
 	void input_position(Type val){
-		Matrix<Type, 1, 1> m; 
-		m << val; 
-		_k.update(m); 
+		Matrix<Type, 1, 1> m;
+		m << val;
+		_k.update(m);
 	}
-	
+
 	void set_prediction(const Matrix<Type, 2, 1> &m){
 		_k.set_xk(m); 
 	}
@@ -78,11 +79,11 @@ public:
 	}
 protected: 
 	virtual Matrix<Type, 2, 1> F(const Matrix<Type, 2, 1> &i) override {
-		Matrix<float, 2, 1> data; 
-		data << 
+		Matrix<float, 2, 1> data;
+		data <<
 			i(0) + i(1),
 			i(1);
-		return data; 
+		return data;
 	}
 	virtual Matrix<Type, 1, 1> H(const Matrix<Type, 2, 1> &i) override {
 		Matrix <float, 1, 1> data;

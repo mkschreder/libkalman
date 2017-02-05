@@ -207,12 +207,14 @@ int main(){
 	printf("vel_x = [];\n");
 	printf("pos_sp = [];\n");
 	printf("vel_sp = [];\n");
+	printf("int_pos = [];\n");
 	//while(std::getline(file, line)){
 
 	struct velcurve curve;
 	velcurve_init(&curve, 0.5, 1.0f, -0.5);
 
 	velcurve_plan_move(&curve, 3.0, 0, 0);
+	float int_pos = 0;
 	for(int c = 0; c < 6000; c++){
 		//float front, back, right, left; 
 		float pos_sp, vel_sp;
@@ -221,14 +223,14 @@ int main(){
 		
 		k.predict();
 
-		float p = pos_sp + 0.2f; //((500 - (rand() % 1000)) * 1e-3) * 0.6f;
-		k.input_position(p); 
-		p = pos_sp - 0.3f; //+ ((500 - (rand() % 1000)) * 1e-3) * 0.9f;
-		k.input_position(p); 
+		float err = ((1000 - (rand() % 2000)) * 1e-3);
+		float p = pos_sp + err * 0.002f;
+		k.input_position(p);
+		//k.input_position(pos_sp);
 
 		Matrix<float, 2, 1> xk = k.get_prediction(); 
 
-		float vel = xk(1) / 0.001;
+		float vel = xk(1) * 1000;
 		float pos = xk(0);
 		if(fabsf(vel) > 2) vel = 0;
 		if(fabsf(pos) > 4) pos = 0;
@@ -237,13 +239,15 @@ int main(){
 		printf("pos_sp = [pos_sp; %f];\n", pos_sp);
 		printf("pos_x = [pos_x; %f];\n", pos);
 		printf("vel_x = [vel_x; %f];\n", vel);
-		
+		printf("int_pos = [int_pos; %f];\n", int_pos);
+	
+		int_pos += xk(1);
 		// start test after 10 iterations
 		//if(it > 10) TEST(is_equal(truth, xk(0), 0.1f)); 
 		it++; 
 	}
 
-	printf("plot(time, pos_x, time, vel_x, time, pos_sp, time, vel_sp, time, pos_sp + 0.2, time, pos_sp - 0.2);\n");
+	printf("plot(time, pos_x, time, vel_x, time, pos_sp, time, vel_sp, time, int_pos);\n");
 	//printf("plot(time, pos_x, time, vel_x);\n");
 	printf("input(\"press any key\");\n");
 
