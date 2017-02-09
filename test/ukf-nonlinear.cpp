@@ -192,6 +192,15 @@ int main(){
 	k.set_prediction(xk); 
 	a.set_prediction(xk); 
 
+	Matrix<float, 3, 3> Q;
+	Q << 
+		1e-2, 0.0, 0.0,
+		0.0, 1e-6, 0.0,
+		0.0, 0.0, 1e-8;
+
+	a.set_Q(Q);
+	a.set_R(0.1);
+
 	int it = 0; 
 
 /*
@@ -230,6 +239,8 @@ int main(){
 		float err = ((1000 - (rand() % 2000)) * 1e-3);
 		float p = pos_sp + err * 0.002f;
 		k.input_position(p);
+		p = pos_sp - err * 0.002f;
+		k.input_position(p);
 
 		Matrix<float, 3, 1> xk = k.get_prediction(); 
 
@@ -242,7 +253,8 @@ int main(){
 		a.input_position(vel);
 		Matrix<float, 3, 1> xka = a.get_prediction(); 
 
-		//acc = xka(1) * 1000;
+		vel = xka(0);
+		acc = xka(1) * 1000;
 		if(fabsf(vel) > 2) vel = 0;
 		if(fabsf(pos) > 4) pos = 0;
 		printf("time = [time; %f];\n", (float)it);

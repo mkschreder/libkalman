@@ -44,7 +44,7 @@ public:
 			0, 0, 0;
 		//Q = _Q_discrete_white_noise_2(0.01, 0.001);  
 		Q << 
-			1e-2, 0.0, 0.0,
+			1e-3, 0.0, 0.0,
 			0.0, 1e-4, 0.0,
 			0.0, 0.0, 1e-7;
 
@@ -60,6 +60,16 @@ public:
 		_k.set_Q(Q); 
 
 		this->_dt = _dt;
+	}
+
+	void set_R(float r){
+		Matrix<float, 1, 1> R;
+		R << r;
+		_k.set_R(R);
+	}
+
+	void set_Q(Matrix<float, 3, 3> &m){
+		_k.set_Q(m);
 	}
 
 	void predict(){
